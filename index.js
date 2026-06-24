@@ -2,25 +2,39 @@ import express from "express";
 import dotenv from "dotenv";
 import mongoose from "mongoose";
 import cors from "cors";
+
 dotenv.config();
+
 const app = express();
-const port = process.env.port || 3000;
+
+// Environment Variables Check
+console.log("PORT:", process.env.PORT);
+console.log("MONGO_URI exists:", !!process.env.MONGO_URI);
+
+const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 app.use(cors());
+
+// MongoDB Connection
 mongoose
   .connect(process.env.MONGO_URI)
   .then(() => {
     console.log("MongoDB connected successfully");
   })
   .catch((err) => {
-    console.log("Database connection error:", err);
+    console.log("Database connection error:", err.message);
   });
+
+// Student Schema
 const studentSchema = new mongoose.Schema({
   rollNo: String,
   name: String,
 });
+
 const Student = mongoose.model("Student", studentSchema);
+
+// Attendance Schema
 const attendanceSchema = new mongoose.Schema({
   studentId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -39,30 +53,40 @@ const attendanceSchema = new mongoose.Schema({
 
 const Attendance = mongoose.model("Attendance", attendanceSchema);
 
+// Home Route
 app.get("/", (req, res) => {
-  res.send("Server has started sucessfully");
+  res.send("Server has started successfully");
 });
 
+// Get All Students
 app.get("/students", async (req, res) => {
   try {
     const students = await Student.find();
     res.status(200).json(students);
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    res.status(500).json({
+      error: err.message,
+    });
   }
 });
 
+// Add Student
 app.post("/students", async (req, res) => {
   try {
     const newStudent = await Student.create({
       rollNo: req.body.rollNo,
       name: req.body.name,
     });
+
     res.status(201).json(newStudent);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({
+      error: err.message,
+    });
   }
 });
+
+// Get Attendance
 app.get("/attendance", async (req, res) => {
   try {
     const attendance = await Attendance.find().populate("studentId");
@@ -74,16 +98,20 @@ app.get("/attendance", async (req, res) => {
     });
   }
 });
+
+// Mark Attendance
 app.post("/attendance", async (req, res) => {
   try {
     const { studentId, date, status } = req.body;
 
     const attendance = await Attendance.findOneAndUpdate(
       {
-        studentId: studentId,
-        date: date,
+        studentId,
+        date,
       },
-      { status: status },
+      {
+        status,
+      },
       {
         new: true,
         upsert: true,
@@ -97,6 +125,8 @@ app.post("/attendance", async (req, res) => {
     });
   }
 });
+
+// Get Today's Attendance
 app.get("/attendance/today", async (req, res) => {
   try {
     const today = new Date().toISOString().split("T")[0];
@@ -112,14 +142,19 @@ app.get("/attendance/today", async (req, res) => {
     });
   }
 });
+
+// Reset Today's Attendance
 app.delete("/attendance/today", async (req, res) => {
   try {
     const today = new Date().toISOString().split("T")[0];
-    const result = await Attendance.deleteMany({ date: today });
+
+    const result = await Attendance.deleteMany({
+      date: today,
+    });
 
     res.status(200).json({
       message: "Today's attendance has been completely reset.",
-      deleteCount: result.deleteCount,
+      deletedCount: result.deletedCount,
     });
   } catch (err) {
     res.status(500).json({
@@ -128,6 +163,7 @@ app.delete("/attendance/today", async (req, res) => {
   }
 });
 
-app.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
+// Start Server
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
 });
